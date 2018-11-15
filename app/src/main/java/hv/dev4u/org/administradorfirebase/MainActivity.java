@@ -25,6 +25,8 @@ import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
 
     //base de datos firebase
     public static CollectionReference dbProductos;
+    public static StorageReference imgFirebase;
 
 
     @Override
@@ -67,13 +70,21 @@ public class MainActivity extends AppCompatActivity {
 
         //inicalizando la base de datos
         dbProductos     = FirebaseFirestore.getInstance().collection("productos");
-        //cada cambio en la bd se llama a actualizar datos
+        //inicializando el almacenamiento en firebase
+        imgFirebase     = FirebaseStorage.getInstance().getReference("imagenes_productos");
+
+
+
+        //cada cambioImagen en la bd se llama a actualizar datos
         dbProductos.addSnapshotListener(new EventListener<QuerySnapshot>() {
             @Override
             public void onEvent(@javax.annotation.Nullable QuerySnapshot queryDocumentSnapshots, @javax.annotation.Nullable FirebaseFirestoreException e) {
                 actualizarDatos(queryDocumentSnapshots.getDocumentChanges());
             }
         });
+
+
+
 
         //menu que se despliega sobre elemento de la lista
         registerForContextMenu(listView);
@@ -204,6 +215,8 @@ public class MainActivity extends AppCompatActivity {
         adaptadorProductos.notifyDataSetChanged();
         Toast.makeText(this, "Datos actualizados", Toast.LENGTH_SHORT).show();
     }
+
+
 
     //obtengo la posicion del producto basado en el id
     private int posicionProducto(String id){
