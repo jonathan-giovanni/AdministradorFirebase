@@ -3,11 +3,8 @@ package hv.dev4u.org.administradorfirebase;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Build;
-import android.os.ParcelFileDescriptor;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
@@ -23,13 +20,15 @@ import android.widget.Toast;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.HashMap;
+
+import hv.dev4u.org.administradorfirebase.utilidades.UtilidadesImagenes;
 
 public class ProductoActivity extends AppCompatActivity {
 
@@ -74,9 +73,10 @@ public class ProductoActivity extends AppCompatActivity {
             lblTitulo.setText("Producto: "+producto.getNombre());
             txtNombre.setText(producto.getNombre());
             txtPrecio.setText(producto.getPrecio());
-
-            //es por que tiene una imagen
-            if(producto.getImagenProducto()!=null){
+            //obtengo imagen desde MainActivity
+            if(producto.getRuta_imagen()!=null && MainActivity.imgSeleccionada!=null ){
+                bitmapProducto  = MainActivity.imgSeleccionada;
+                imgProducto.setImageBitmap(bitmapProducto);
                 btnEliminarImg.setEnabled(true);
             }
         }
@@ -92,21 +92,21 @@ public class ProductoActivity extends AppCompatActivity {
         btnGuardar.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                guardarProducto();
+                prepararSubidaProducto();
             }
         });
 
         btnCambiarImg.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                cambiarImg();
+                seleccionarImg();
             }
         });
 
         btnEliminarImg.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                eliminarImagen();
+                limpiarImagen();
             }
         });
 
@@ -115,56 +115,63 @@ public class ProductoActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if(bitmapProducto!=null){
                     cambioImagen=true;
-                    Matrix matrix = new Matrix();
-                    matrix.postRotate(90);
-                    bitmapProducto = Bitmap.createBitmap(bitmapProducto, 0, 0, bitmapProducto.getWidth(), bitmapProducto.getHeight(), matrix, true);
+                    bitmapProducto = UtilidadesImagenes.rotarImagen(bitmapProducto);
                     imgProducto.setImageBitmap(bitmapProducto);
                 }
             }
         });
-
     }
 
 
-    private void guardarImagen(final DocumentReference referencia, final HashMap<String,Object> datos){
 
-        if(cambioImagen && bitmapProducto!=null){
 
-            String id_img = referencia.getId();
-            //crea una referencia la cual se llamara como el id del documento
-            final StorageReference refImgFirebase = MainActivity.imgFirebase.child(id_img+".jpg");
-            //convierto la imagen a un array de bytes y la subo a firebase
-            ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            bitmapProducto.compress(Bitmap.CompressFormat.JPEG, 90, stream);
-            byte[] imageInByte = stream.toByteArray();
+    //si txtPrecio y txtNombre no estan vacios entonces son validos
+    private boolean camposValido(){
+        return !txtPrecio.getText().toString().isEmpty() && !txtNombre.getText().toString().isEmpty();
+    }
 
-            //supervisa el estado de la carga
-            UploadTask uploadTask = refImgFirebase.putBytes(imageInByte);
 
-            uploadTask.addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-                        @Override
-                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                            datos.put("ruta_imagen",refImgFirebase.getPath());
-                            subirDatos(referencia,datos);
-                        }
-                    })
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            Toast.makeText(ProductoActivity.this, "Error al subir imagen", Toast.LENGTH_SHORT).show();
-                        }
-                    });
+
+    private void prepararSubidaProducto(){
+        if(camposValido()) {
+            DocumentReference referenciaProducto;
+
+            String nombre = txtNombre.getText().toString();
+            String precio = txtPrecio.getText().toString();
+
+            HashMap<String,Object> productoBD = new HashMap<>();
+            productoBD.put("nombre",nombre);
+            productoBD.put("precio",precio);
+
+            //si el producto que tengo no es nulo es por que es una edicion
+            if(producto!=null){
+                referenciaProducto  = MainActivity.dbProductos.document(producto.getId_producto());
+            }else{
+                referenciaProducto  = MainActivity.dbProductos.document();
+            }
+
+            //si la imagen cambio entonces se procede a
+            if(cambioImagen){
+                actualizarImagen(referenciaProducto,productoBD);
+            }else{
+                guardarDatos(referenciaProducto,productoBD,true);
+            }
+
         }else{
-            subirDatos(referencia,datos);
+            Toast.makeText(this, "Debe llenar los campos", Toast.LENGTH_LONG).show();
         }
     }
 
-    private void subirDatos(final DocumentReference referencia, final HashMap<String,Object> datos){
-        referencia.set(datos)
+
+    private void guardarDatos(final DocumentReference referencia, final HashMap<String,Object> datos, final boolean cerrar){
+        referencia.set(datos,SetOptions.merge())
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
                     public void onSuccess(Void aVoid) {
-                        Toast.makeText(ProductoActivity.this, "Producto Guardado", Toast.LENGTH_SHORT).show();
+                        if(cerrar){
+                            Toast.makeText(ProductoActivity.this, "Producto guardado", Toast.LENGTH_SHORT).show();
+                            ProductoActivity.this.finish();
+                        }
                     }
                 })
                 .addOnFailureListener(new OnFailureListener() {
@@ -174,37 +181,72 @@ public class ProductoActivity extends AppCompatActivity {
                     }
                 });
     }
+    /** Las siguientes son funciones para la administracion de la imagen*/
+
+    private void actualizarImagen(final DocumentReference referencia, final HashMap<String,Object> datos){
 
 
-    private void guardarProducto(){
+        //id de la imagen
+        String id_img = referencia.getId()+".jpg";
 
-        if(camposValido()) {
+        //referencia a la imagen en firebase
+        final StorageReference refImgFirebase = MainActivity.imgProductosFirebase.child(id_img);
 
-            DocumentReference referenciaProducto;
-            //si el producto que tengo no es nulo es por que es una edicion
-            if(producto!=null){
-                referenciaProducto  = MainActivity.dbProductos.document(producto.getId_producto());
-            }else{
-                referenciaProducto  = MainActivity.dbProductos.document();
+        if(bitmapProducto!=null ){
+
+            datos.put("ruta_imagen",FieldValue.delete());
+            guardarDatos(referencia,datos,false);
+
+
+            //establecememos la ruta
+            datos.put("ruta_imagen",id_img);
+
+            //imagen en bytes
+            byte[] imagenEnBytes = UtilidadesImagenes.getImagenEnBytes(bitmapProducto);
+
+            //supervisa el estado de la carga
+            refImgFirebase
+                    .putBytes(imagenEnBytes)
+                    .addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                        @Override
+                        public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                            guardarDatos(referencia,datos,true);
+                        }
+                    })
+                    .addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            Toast.makeText(ProductoActivity.this, "Error al subir imagen", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+
+
+            //en caso de liminacion, si el producto tiene datos
+        }else if(producto!=null){
+            //si tiene una ruta de imagen entonces se borra
+            if(producto.getRuta_imagen()!=null){
+                datos.put("ruta_imagen",FieldValue.delete());
+
+                //borrando de firebase
+                refImgFirebase
+                        .delete()
+                        .addOnSuccessListener(new OnSuccessListener<Void>() {
+                            @Override
+                            public void onSuccess(Void aVoid) {
+                                guardarDatos(referencia,datos,true);
+                            }
+                        })
+                        .addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+
+                            }
+                        });
             }
-
-            String nombre = txtNombre.getText().toString();
-            String precio = txtPrecio.getText().toString();
-
-            HashMap<String,Object> productoBD = new HashMap<>();
-            productoBD.put("nombre",nombre);
-            productoBD.put("precio",precio);
-
-
-            guardarImagen(referenciaProducto,productoBD);
-
-        }else{
-            Toast.makeText(this, "Debe llenar los campos", Toast.LENGTH_LONG).show();
         }
-
     }
 
-    private void cambiarImg() {
+    private void seleccionarImg() {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED) {
             //ask for permission
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -225,14 +267,14 @@ public class ProductoActivity extends AppCompatActivity {
             Uri selectedImage = data.getData();
             Bitmap bmp = null;
             try {
-                bmp = getBitmapFromUri(selectedImage);
+                bmp = UtilidadesImagenes.getImagenDesdeRuta(getApplicationContext(),selectedImage);
             } catch (IOException e) {
                 Toast.makeText(this,"Error al cargar imagen",Toast.LENGTH_LONG).show();
                 e.printStackTrace();
             }
             if(bmp!=null){
                 //se reduce la imagen
-                bmp = reducirImagen(bmp);
+                bmp = UtilidadesImagenes.reducirImagen(bmp);
                 //si la reduccion fue exitosa retorna un bitmap reducido
                 if(bmp!=null){
                     cambioImagen =true;
@@ -244,66 +286,12 @@ public class ProductoActivity extends AppCompatActivity {
         }
     }
 
-
-
-    private void eliminarImagen(){
-
-        if(producto.getRuta_imagen()!=null){
-            //proceder a eliminar de la BD
-            
-        }else{
-            limpiarImagen();
-        }
-    }
-
     private void limpiarImagen(){
+        cambioImagen=true;
         bitmapProducto=null;
         producto.setImagenProducto(null);
         imgProducto.setImageResource(R.drawable.ic_producto);
         btnEliminarImg.setEnabled(false);
     }
-    
 
-    //si txtPrecio y txtNombre no estan vacios entonces son validos
-    private boolean camposValido(){
-        return !txtPrecio.getText().toString().isEmpty() && !txtNombre.getText().toString().isEmpty();
-    }
-
-
-    private Bitmap getBitmapFromUri(Uri uri) throws IOException {
-        ParcelFileDescriptor parcelFileDescriptor =
-                getContentResolver().openFileDescriptor(uri, "r");
-        FileDescriptor fileDescriptor = parcelFileDescriptor.getFileDescriptor();
-        Bitmap image = BitmapFactory.decodeFileDescriptor(fileDescriptor);
-        parcelFileDescriptor.close();
-        return image;
-    }
-
-    private Bitmap reducirImagen(Bitmap original){
-        //reduciendo imagen a formato JPG y con calidad del 70%
-        Bitmap reducedBitmap = original;
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        reducedBitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream);
-        byte[] imageInByte = stream.toByteArray();
-        float lengthbmp = imageInByte.length;
-        lengthbmp /= 1024;//to Kb
-        //reduciendo aun mas a 1/4 del tamanio
-        reducedBitmap = Bitmap.createScaledBitmap (reducedBitmap,(int) (reducedBitmap.getWidth() * .4), (int) (reducedBitmap.getHeight() * .4),true);
-
-        //si la imagen pesa mas de 200kb se reduce aun mas
-        if(lengthbmp>200.00){
-            stream = new ByteArrayOutputStream();
-            reducedBitmap.compress(Bitmap.CompressFormat.JPEG, 60, stream);
-            imageInByte = stream.toByteArray();
-            lengthbmp = imageInByte.length;
-            lengthbmp /= 1024;//to Kb
-        }
-        //si la imagen apesar de las reducciones pesa mas de 1MB entonces no es una imagen valida
-        if(lengthbmp>1024){
-            Toast.makeText(this, "Imagen demasiado pesada, intenta con otra", Toast.LENGTH_LONG).show();
-            return null;
-        }else{
-            return reducedBitmap;
-        }
-    }
 }

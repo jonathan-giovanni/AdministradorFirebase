@@ -5,13 +5,14 @@ import android.graphics.Bitmap;
 import java.io.Serializable;
 
 public class Producto implements Serializable {
-    public String nombre,precio,id_producto,ruta_imagen;
-    public Bitmap imagenProducto;
+    public String id_producto,nombre,precio,ruta_imagen;
+    public transient Bitmap imagenProducto;
 
 
     public Producto(){
         nombre=precio=id_producto="";
-        imagenProducto = null;
+        ruta_imagen = null;
+        imagenProducto =null;
     }
 
 
@@ -21,10 +22,17 @@ public class Producto implements Serializable {
         this.id_producto = id_producto;
     }
 
-    public Producto(String nombre, String precio, String id_producto, String ruta_imagen, Bitmap imagenProducto) {
+    public Producto(String id_producto, String nombre, String precio, String ruta_imagen) {
+        this.id_producto = id_producto;
         this.nombre = nombre;
         this.precio = precio;
+        this.ruta_imagen = ruta_imagen;
+    }
+
+    public Producto(String id_producto, String nombre, String precio, String ruta_imagen, Bitmap imagenProducto) {
         this.id_producto = id_producto;
+        this.nombre = nombre;
+        this.precio = precio;
         this.ruta_imagen = ruta_imagen;
         this.imagenProducto = imagenProducto;
     }

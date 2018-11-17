@@ -2,6 +2,8 @@ package hv.dev4u.org.administradorfirebase;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AlertDialog;
@@ -44,7 +46,8 @@ public class MainActivity extends AppCompatActivity {
 
     //base de datos firebase
     public static CollectionReference dbProductos;
-    public static StorageReference imgFirebase;
+    public static StorageReference imgProductosFirebase;
+    public static Bitmap imgSeleccionada=null;
 
 
     @Override
@@ -71,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
         //inicalizando la base de datos
         dbProductos     = FirebaseFirestore.getInstance().collection("productos");
         //inicializando el almacenamiento en firebase
-        imgFirebase     = FirebaseStorage.getInstance().getReference("imagenes_productos");
+        imgProductosFirebase = FirebaseStorage.getInstance().getReference("imagenes_productos");
 
 
 
@@ -82,9 +85,6 @@ public class MainActivity extends AppCompatActivity {
                 actualizarDatos(queryDocumentSnapshots.getDocumentChanges());
             }
         });
-
-
-
 
         //menu que se despliega sobre elemento de la lista
         registerForContextMenu(listView);
@@ -146,6 +146,10 @@ public class MainActivity extends AppCompatActivity {
     private void editarProducto(Producto producto){
         Intent intent = new Intent(this,ProductoActivity.class);
         intent.putExtra("PRODUCTO",producto);
+
+        if(producto.getImagenProducto()!=null){
+            imgSeleccionada = producto.getImagenProducto();
+        }
         startActivity(intent);
     }
 
@@ -184,6 +188,11 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(MainActivity.this, "Ha ocurrido un error al intentar eliminar", Toast.LENGTH_SHORT).show();
                     }
                 });
+        if(producto.getRuta_imagen()!=null){
+            imgProductosFirebase
+                    .child(producto.getRuta_imagen())
+                    .delete();
+        }
     }
 
 
@@ -193,14 +202,43 @@ public class MainActivity extends AppCompatActivity {
             //obtengo el documento
             DocumentSnapshot document = document_changed.getDocument();
             //obtengo la posicion del producto basado en el Id
-            int posicion = posicionProducto(document.getId());
+            final int posicion = posicionProducto(document.getId());
             //si el documento fue eliminado
             if(document_changed.getType()==DocumentChange.Type.REMOVED){
                 //se elimina de la lista tambien
                 listaProductos.remove(posicion);
             }else {
                 //obtengo un objeto producto del documento
-                Producto producto = getProducto(document);
+                final Producto producto = getProducto(document);
+
+                //si la ruta no esta vacia entonces es por que apunta a una imagen
+                if(producto.getRuta_imagen()!=null){
+                    //preparo un megabyte para almacenar la imagen
+                    final long ONE_MEGABYTE = 1024 * 1024;
+                    imgProductosFirebase.child(producto.getRuta_imagen())
+                            .getBytes(ONE_MEGABYTE)
+                            .addOnSuccessListener(new OnSuccessListener<byte[]>() {
+                                @Override
+                                public void onSuccess(byte[] bytes) {
+                                    //descargo la imagen y la convierto a bitmap
+                                    final int pos = posicionProducto(producto.getId_producto());
+                                    Bitmap imagen = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                    listaProductos.get(pos).setImagenProducto(imagen);
+                                    //notifico de los cambios
+                                    adaptadorProductos.notifyDataSetChanged();
+                                }
+                            })
+                            .addOnFailureListener(new OnFailureListener() {
+                                @Override
+                                public void onFailure(@NonNull Exception e) {
+                                    Toast.makeText(MainActivity.this, "Ocurrio un error al descargar la imagen", Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                }else{
+                    // si no trae ruta por defecto se pone null a la imagen
+                    producto.setImagenProducto(null);
+                }
+
                 //si la posicion es mayor a cero es por que existe en la lista y se actualiza
                 if (posicion >= 0) {
                     listaProductos.set(posicion, producto);
@@ -213,7 +251,6 @@ public class MainActivity extends AppCompatActivity {
         }
         //notifico al adaptador de los cambios
         adaptadorProductos.notifyDataSetChanged();
-        Toast.makeText(this, "Datos actualizados", Toast.LENGTH_SHORT).show();
     }
 
 
@@ -233,6 +270,7 @@ public class MainActivity extends AppCompatActivity {
         String id       = doc.getId();
         String nombre   = doc.getString("nombre");
         String precio   = doc.getString("precio");
-        return new Producto(id,nombre,precio);
+        String ruta     = doc.getString("ruta_imagen");
+        return new Producto(id,nombre,precio,ruta);
     }
 }

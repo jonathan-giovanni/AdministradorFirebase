@@ -11,7 +11,7 @@
         android:textColor="@android:color/holo_blue_light"
         android:id="@+id/lbl_id_prod"
         android:text="1"
-        android:textSize="30sp"
+        android:textSize="34sp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
     <ImageView
@@ -19,8 +19,8 @@
         android:layout_marginLeft="10dp"
         android:id="@+id/imgItemProd"
         android:src="@drawable/ic_producto"
-        android:layout_width="50dp"
-        android:layout_height="50dp" />
+        android:layout_width="70dp"
+        android:layout_height="70dp" />
     <LinearLayout
         android:gravity="center"
         android:orientation="vertical"
@@ -28,14 +28,14 @@
         android:layout_height="wrap_content">
         <TextView
             android:textColor="@android:color/holo_orange_dark"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:id="@+id/lblNombreProducto"
             android:text="Producto: "
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
         <TextView
             android:textColor="@android:color/holo_purple"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:id="@+id/lblPrecioProducto"
             android:text="Precio: "
             android:layout_width="match_parent"

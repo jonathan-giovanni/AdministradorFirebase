@@ -36,7 +36,11 @@ public class AdaptadorProductos extends ArrayAdapter<Producto> {
 
         if(p.getImagenProducto()!=null){
             imgProducto.setImageBitmap(p.getImagenProducto());
+        }else{
+            imgProducto.setImageResource(R.drawable.ic_producto);
         }
+
+
 
 
         return convertView;
