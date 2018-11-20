@@ -2,6 +2,9 @@
 Administrador de datos utilizando cloud firestore
 
 
+
+<img src="https://github.com/jonathancplusplus/AdministradorFirebase/blob/master/capturas/app_admin.jpg" >
+
 <b>Este proyecto tiene las siguientes caracteristicas: </b>
 
 * Permite: Crear, Modificar, Eliminar y Consultar documentos pertenecientes a la colección "productos"
