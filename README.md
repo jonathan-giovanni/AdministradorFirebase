@@ -32,3 +32,10 @@ La estructura de la BD es la siguiente
           .
           Hasta N documentos bajo la coleccion productos
           
+
+<img src="https://github.com/jonathancplusplus/AdministradorFirebase/blob/master/capturas/cloud_firestore.png" >
+
+
+La forma de guardar la imagen es dentro de un folder llamado <b>imagenes_productos</b>
+
+<img src="https://github.com/jonathancplusplus/AdministradorFirebase/blob/master/capturas/storage.png" >
