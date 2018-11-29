@@ -1,6 +1,7 @@
 package hv.dev4u.org.administradorfirebase;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -10,6 +11,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -25,9 +27,17 @@ import com.google.firebase.firestore.SetOptions;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 
+import fcm.androidtoandroid.FirebasePush;
+import fcm.androidtoandroid.connection.PushNotificationTask;
+import fcm.androidtoandroid.model.Notification;
 import hv.dev4u.org.administradorfirebase.utilidades.UtilidadesImagenes;
 
 public class ProductoActivity extends AppCompatActivity {
@@ -46,10 +56,20 @@ public class ProductoActivity extends AppCompatActivity {
     Bitmap bitmapProducto;
     boolean cambioImagen =false;
 
+
+
+    public static final String MY_PREFS_NAME = "MyPrefsFile";
+
+    SharedPreferences.Editor editor;
+    SharedPreferences prefs;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_producto);
+        //guardar fecha y hora de ultima notificacion
+        editor  = getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE).edit();
+        prefs   = getSharedPreferences(MY_PREFS_NAME, MODE_PRIVATE);
 
         //inicializando controles
         lblTitulo   = findViewById(R.id.lblTitulo);
@@ -170,6 +190,11 @@ public class ProductoActivity extends AppCompatActivity {
                     public void onSuccess(Void aVoid) {
                         if(cerrar){
                             Toast.makeText(ProductoActivity.this, "Producto guardado", Toast.LENGTH_SHORT).show();
+
+                            if(lanzarNotificacion()){
+                                notificacion();
+                            }
+
                             ProductoActivity.this.finish();
                         }
                     }
@@ -181,6 +206,74 @@ public class ProductoActivity extends AppCompatActivity {
                     }
                 });
     }
+
+
+    private void notificacion(){
+
+        FirebasePush firebasePush = new FirebasePush("AIzaSyBMcJUPPPDzJ0ACTnUYnnACoUbfSqMB86Q");
+
+        firebasePush.setAsyncResponse(new PushNotificationTask.AsyncResponse() {
+            @Override
+            public void onFinishPush(@NotNull String ouput) {
+                Log.e("NOTIFICACION", ouput);
+            }
+        });
+        firebasePush.setNotification(new Notification("Salon RMR","Productos actualizados"));
+
+        firebasePush.sendToTopic("hv.dev4u.org.clientefirebase");
+
+
+
+
+    }
+
+    private boolean lanzarNotificacion(){
+        Date now = new Date();
+
+        String fecha_previa = prefs.getString("date",null);
+        if(fecha_previa!=null){
+            //cambios cada 10 minutos
+
+            Date previous = getDateHoraFecha(fecha_previa);
+
+            if (now.getTime() - previous.getTime() >= 10*60*1000) {
+                fecha_previa = getStringHoraFecha(now);
+                editor.putString("date",fecha_previa);
+                editor.apply();
+                return true;
+            }else{
+                return false;
+            }
+        }else{
+            fecha_previa = getStringHoraFecha(now);
+            editor.putString("date",fecha_previa);
+            editor.apply();
+            return true;
+        }
+    }
+
+
+    private Date getDateHoraFecha(String horaFecha){
+        String pattern = "yyyy-MM-dd hh:mm:ss a";
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
+        Date date = null;
+        try {
+            date = simpleDateFormat.parse(horaFecha);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+
+        return date;
+    }
+
+
+    private String getStringHoraFecha(Date today){
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a");
+        String dateToStr = format.format(today);
+        return dateToStr;
+    }
+
+
     /** Las siguientes son funciones para la administracion de la imagen*/
 
     private void actualizarImagen(final DocumentReference referencia, final HashMap<String,Object> datos){
